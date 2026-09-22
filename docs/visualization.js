@@ -99,8 +99,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
         const [graphRes, metaRes] = await Promise.all([
-            fetch("../data/clustered_graph.json"),
-            fetch("../data/node_metadata.json").catch(() => ({ json: () => ({}) }))
+            fetch("data/clustered_graph.json"),
+            fetch("data/node_metadata.json").catch(() => ({ json: () => ({}) }))
         ]);
         
         const data = await graphRes.json();

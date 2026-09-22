@@ -34,15 +34,15 @@ orange-code-topology/
 ├── docs/                      # GitHub Pages Web Application
 │   ├── index.html             # Main HTML layout
 │   ├── styles.css             # Bitcoin Data Labs styling
-│   └── visualization.js       # Sigma.js / Graphology interaction logic
+│   ├── visualization.js       # Sigma.js / Graphology interaction logic
+│   └── data/                  # Output graph datasets
+│       ├── bitcoin_includes.json  # Raw dependency map
+│       ├── clustered_graph.json   # Nodes, edges, and community IDs
+│       └── node_metadata.json     # Graph metrics & subsystem metadata
 ├── scripts/                   # Data processing pipeline
 │   ├── extract_dependencies.py # Scans C++ source tree for #include directives
 │   ├── build_graph.py         # Builds NetworkX graph & computes Louvain clusters
 │   └── generate_metadata.py   # Generates node metadata & degree stats
-├── data/                      # Output graph datasets
-│   ├── bitcoin_includes.json  # Raw dependency map
-│   ├── clustered_graph.json   # Nodes, edges, and community IDs
-│   └── node_metadata.json     # Graph metrics & subsystem metadata
 └── requirements.txt           # Python dependencies for pipeline
 ```
 
@@ -57,10 +57,10 @@ To extract dependencies from a local clone of Bitcoin Core (`bitcoin/src`):
 pip install -r requirements.txt
 
 # 2. Extract include dependencies
-python3 scripts/extract_dependencies.py --src /path/to/bitcoin/src --out data/bitcoin_includes.json
+python3 scripts/extract_dependencies.py --src /path/to/bitcoin/src --out docs/data/bitcoin_includes.json
 
 # 3. Build graph & run Louvain clustering
-python3 scripts/build_graph.py
+python3 scripts/build_graph.py --input docs/data/bitcoin_includes.json --output docs/data/clustered_graph.json
 
 # 4. Generate node metadata
 python3 scripts/generate_metadata.py

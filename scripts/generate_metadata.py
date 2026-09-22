@@ -53,8 +53,7 @@ def generate_description(filename):
     return "Bitcoin Core C++ source file."
 
 def main():
-    graph_path = os.path.join(os.path.dirname(__file__), '../data/clustered_graph.json')
-    out_path = os.path.join(os.path.dirname(__file__), '../data/node_metadata.json')
+    graph_path = os.path.join(os.path.dirname(__file__), '../docs/data/clustered_graph.json')
     docs_out_path = os.path.join(os.path.dirname(__file__), '../docs/data/node_metadata.json')
     
     with open(graph_path, 'r') as f:
@@ -68,15 +67,11 @@ def main():
             "github_url": f"https://github.com/bitcoin/bitcoin/tree/master/src/{node_id}" if '/' in node_id or node_id.endswith('.cpp') or node_id.endswith('.h') else f"https://github.com/bitcoin/bitcoin/search?q={node_id}"
         }
         
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path, 'w') as f:
-        json.dump(metadata, f, indent=2)
-
     os.makedirs(os.path.dirname(docs_out_path), exist_ok=True)
     with open(docs_out_path, 'w') as f:
         json.dump(metadata, f, indent=2)
         
-    print(f"Generated metadata for {len(metadata)} nodes at {out_path} and {docs_out_path}")
+    print(f"Generated metadata for {len(metadata)} nodes at {docs_out_path}")
 
 if __name__ == "__main__":
     main()

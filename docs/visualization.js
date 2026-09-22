@@ -168,6 +168,37 @@ document.addEventListener("DOMContentLoaded", async () => {
             iterations: 150,
             settings: sensibleSettings
         });
+
+        // Reposition zero-degree isolated nodes onto the perimeter of the connected graph
+        // This prevents them from flying to extreme coordinates and shrinking the main graph
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        graph.forEachNode((node, attrs) => {
+            if ((attrs.in_degree > 0 || attrs.out_degree > 0) && !isNaN(attrs.x) && !isNaN(attrs.y)) {
+                minX = Math.min(minX, attrs.x);
+                maxX = Math.max(maxX, attrs.x);
+                minY = Math.min(minY, attrs.y);
+                maxY = Math.max(maxY, attrs.y);
+            }
+        });
+
+        if (minX !== Infinity) {
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            const radius = Math.max((maxX - minX), (maxY - minY)) * 0.52;
+
+            const isolatedNodes = [];
+            graph.forEachNode((node, attrs) => {
+                if (attrs.in_degree === 0 && attrs.out_degree === 0) {
+                    isolatedNodes.push(node);
+                }
+            });
+
+            isolatedNodes.forEach((node, i) => {
+                const angle = (i / (isolatedNodes.length || 1)) * 2 * Math.PI;
+                graph.setNodeAttribute(node, 'x', centerX + Math.cos(angle) * radius);
+                graph.setNodeAttribute(node, 'y', centerY + Math.sin(angle) * radius);
+            });
+        }
         
         loadingIndicator.style.display = 'none';
         
@@ -287,50 +318,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         setupUIInteractions();
         
         populateSidebars();
-        fitCameraToMainGraph(false);
         renderer.refresh();
         
     } catch (err) {
         console.error("Error initializing visualization:", err);
         loadingIndicator.innerHTML = `<div style="color: #F87171;">Failed to load data: ${err.message}</div>`;
-    }
-
-    function fitCameraToMainGraph(animate = false) {
-        if (!graph || !renderer) return;
-        const xs = [];
-        const ys = [];
-        graph.forEachNode((node, attrs) => {
-            if (!attrs.hidden && typeof attrs.x === 'number' && typeof attrs.y === 'number') {
-                xs.push(attrs.x);
-                ys.push(attrs.y);
-            }
-        });
-        
-        if (xs.length === 0) return;
-        
-        xs.sort((a, b) => a - b);
-        ys.sort((a, b) => a - b);
-        
-        // Exclude extreme 2.5% outliers to focus on the core topology
-        const lowIdx = Math.floor(xs.length * 0.025);
-        const highIdx = Math.ceil(xs.length * 0.975) - 1;
-        
-        const minX = xs[lowIdx];
-        const maxX = xs[highIdx];
-        const minY = ys[lowIdx];
-        const maxY = ys[highIdx];
-        
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-        
-        const camera = renderer.getCamera();
-        const targetState = { x: centerX, y: centerY, ratio: 0.38 };
-        
-        if (animate) {
-            camera.animate(targetState, { duration: 400 });
-        } else {
-            camera.setState(targetState);
-        }
     }
     
     // --- Convex Hull Utilities ---
@@ -626,7 +618,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             renderer.getCamera().animatedUnzoom({ duration: 300 });
         });
         document.getElementById('reset-view').addEventListener('click', () => {
-            fitCameraToMainGraph(true);
+            renderer.getCamera().animatedReset({ duration: 300 });
             selectedNode = null;
             openNodeDetails(null);
             renderer.refresh();

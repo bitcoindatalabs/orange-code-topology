@@ -287,11 +287,50 @@ document.addEventListener("DOMContentLoaded", async () => {
         setupUIInteractions();
         
         populateSidebars();
+        fitCameraToMainGraph(false);
         renderer.refresh();
         
     } catch (err) {
         console.error("Error initializing visualization:", err);
         loadingIndicator.innerHTML = `<div style="color: #F87171;">Failed to load data: ${err.message}</div>`;
+    }
+
+    function fitCameraToMainGraph(animate = false) {
+        if (!graph || !renderer) return;
+        const xs = [];
+        const ys = [];
+        graph.forEachNode((node, attrs) => {
+            if (!attrs.hidden && typeof attrs.x === 'number' && typeof attrs.y === 'number') {
+                xs.push(attrs.x);
+                ys.push(attrs.y);
+            }
+        });
+        
+        if (xs.length === 0) return;
+        
+        xs.sort((a, b) => a - b);
+        ys.sort((a, b) => a - b);
+        
+        // Exclude extreme 2.5% outliers to focus on the core topology
+        const lowIdx = Math.floor(xs.length * 0.025);
+        const highIdx = Math.ceil(xs.length * 0.975) - 1;
+        
+        const minX = xs[lowIdx];
+        const maxX = xs[highIdx];
+        const minY = ys[lowIdx];
+        const maxY = ys[highIdx];
+        
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        
+        const camera = renderer.getCamera();
+        const targetState = { x: centerX, y: centerY, ratio: 0.38 };
+        
+        if (animate) {
+            camera.animate(targetState, { duration: 400 });
+        } else {
+            camera.setState(targetState);
+        }
     }
     
     // --- Convex Hull Utilities ---
@@ -587,7 +626,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             renderer.getCamera().animatedUnzoom({ duration: 300 });
         });
         document.getElementById('reset-view').addEventListener('click', () => {
-            renderer.getCamera().animatedReset({ duration: 300 });
+            fitCameraToMainGraph(true);
             selectedNode = null;
             openNodeDetails(null);
             renderer.refresh();

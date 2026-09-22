@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Core Code Topology</title>
+
+    <!-- Bitcoin Data Labs styles -->
+    <link rel="stylesheet" href="https://bitcoindatalabs.org/styles/styles.css"
+        onerror="this.onerror=null; this.href='https://sorukumar.github.io/Bitcoin-Data-Labs/styles/styles.css'">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Local styles -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Load dependencies in correct order -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.4/graphology.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/graphology-library/dist/graphology-library.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
+</head>
+<body class="visualization-page">
+    <!-- Bitcoin Data Labs Header -->
+    <div id="header"></div>
+
+    <div id="container">
+        <div id="graph-container">
+            <!-- Network Summary Title -->
+            <div id="network-summary" class="network-summary">
+                <h2 class="summary-title">Bitcoin Core Topology</h2>
+                <div class="summary-subtitle">
+                    A structural map of the `bitcoin` C++ source code based on internal `#include` dependencies.
+                </div>
+            </div>
+
+            <!-- Loading indicator -->
+            <div id="loading-indicator"
+                style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--surface); padding: 24px 32px; border-radius: 12px; box-shadow: 0 4px 16px rgba(42, 51, 66, 0.15); z-index: 2000; text-align: center;">
+                <i class="fas fa-spinner fa-spin"
+                    style="font-size: 32px; color: var(--primary); margin-bottom: 12px;"></i>
+                <div style="color: var(--text-primary); font-weight: 500;">Loading dataset & computing layout...</div>
+            </div>
+
+            <!-- Cluster Overlays -->
+            <svg id="cluster-boundaries"
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; opacity: 1; transition: opacity 0.5s;"></svg>
+            <div id="cluster-labels-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;"></div>
+
+            <!-- Tooltip -->
+            <div class="tooltip" id="tooltip"></div>
+
+            <div id="viz" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></div>
+
+            <!-- Stacked Controls -->
+            <div class="controls-stacked">
+                <button class="control-btn-icon" id="zoom-in" title="Zoom In"><i class="fas fa-plus"></i></button>
+                <button class="control-btn-icon" id="zoom-out" title="Zoom Out"><i class="fas fa-minus"></i></button>
+                <button class="control-btn-icon" id="reset-view" title="Reset View"><i class="fas fa-compress-arrows-alt"></i></button>
+            </div>
+        </div>
+
+        <!-- Floating Panels Right -->
+        <div id="floating-panels" class="floating-panels">
+            <div id="sidebar-main" class="panels-stack">
+                <!-- Search Card -->
+                <div class="panel-card">
+                    <div class="search-wrapper sidebar-search">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="search-input" placeholder="Search files...">
+                    </div>
+                </div>
+
+                <!-- Description Card -->
+                <div class="panel-card accordion-item active">
+                    <button class="accordion-header">
+                        <span><i class="fas fa-info-circle"></i> Graph Stats</span>
+                    </button>
+                    <div class="accordion-content" style="display: block;">
+                        <p>Colors represent structural subsystems (Louvain clusters).</p>
+                        <div class="tooltip-metric">
+                            <span class="tooltip-metric-label">Nodes (Files)</span>
+                            <span class="tooltip-metric-value" id="node-count">-</span>
+                        </div>
+                        <div class="tooltip-metric">
+                            <span class="tooltip-metric-label">Edges (Includes)</span>
+                            <span class="tooltip-metric-value" id="edge-count">-</span>
+                        </div>
+                        <div class="tooltip-metric">
+                            <span class="tooltip-metric-label">Subsystems</span>
+                            <span class="tooltip-metric-value" id="cluster-count">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Clusters Card -->
+                <div class="panel-card accordion-item active">
+                    <button class="accordion-header">
+                        <span><i class="fas fa-project-diagram"></i> Subsystems</span>
+                        <i class="fas fa-chevron-up accordion-arrow"></i>
+                    </button>
+                    <div class="accordion-content" style="display: block;">
+                        <div class="filter-actions" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; margin-bottom: 8px;">
+                            <button onclick="window.checkAllClusters()"><i class="far fa-check-circle"></i> All</button>
+                            <button onclick="window.uncheckAllClusters()"><i class="far fa-times-circle"></i> None</button>
+                        </div>
+                        <div id="clusters-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Details Card (Hidden initially) -->
+            <div id="sidebar-details" class="panel-card details-card" style="display: none;">
+                <button id="back-to-main" class="back-btn"><i class="fas fa-arrow-left"></i> Back to map</button>
+                <div id="node-details-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bitcoin Data Labs Footer -->
+    <div id="footer"></div>
+
+    <!-- Bitcoin Data Labs App Components -->
+    <script>
+        function loadBitcoinLabsScript(primarySrc, fallbackSrc, callback) {
+            const script = document.createElement('script');
+            script.src = primarySrc;
+            script.onload = callback;
+            script.onerror = () => {
+                const fallback = document.createElement('script');
+                fallback.src = fallbackSrc;
+                fallback.onload = callback;
+                document.head.appendChild(fallback);
+            };
+            document.head.appendChild(script);
+        }
+
+        function getAppHomeUrl() {
+            return window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/');
+        }
+
+        loadBitcoinLabsScript(
+            'https://bitcoindatalabs.org/components/app-components.js',
+            'https://sorukumar.github.io/Bitcoin-Data-Labs/components/app-components.js',
+            () => {
+                const appConfig = {
+                    isApp: true,
+                    appName: 'orange-code-topology',
+                    appHomeUrl: getAppHomeUrl()
+                };
+
+                if (window.BitcoinLabsApp && typeof BitcoinLabsApp.init === 'function') {
+                    BitcoinLabsApp.init(appConfig);
+                }
+
+                if (window.BitcoinLabsAppComponents && typeof BitcoinLabsAppComponents.init === 'function') {
+                    BitcoinLabsAppComponents.init(appConfig);
+                }
+            }
+        );
+    </script>
+    <script src="visualization.js"></script>
+</body>
+</html>
